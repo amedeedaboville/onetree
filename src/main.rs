@@ -1,8 +1,6 @@
 use noisy_float::prelude::*;
-use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
-use std::io::{self, Read};
 use std::fs;
 extern crate tsplib;
 use tsplib::*;
@@ -11,7 +9,7 @@ fn main() {
   println!("Hello, TSP. Using testdata/berlin52.tsp as input !");
   // let mut input = String::new();
   // io::stdin().read_to_string(&mut input);
-  let mut tsp = TSP::new("testdata/berlin52.tsp");
+  let mut tsp = TSP::new("testdata/berlin52.tsp".to_string());
   tsp.solve();
 }
 // simple exact TSP solver based on branch-and-bound/Held--Karp
@@ -237,13 +235,13 @@ impl TSP {
   fn new(input: String) -> TSP {
     let file_contents = fs::read_to_string(input).unwrap();
     let problem = parse_whole_problem(&file_contents).unwrap().1;
-    let n: usize = problem.meta.dimension;
+    let n: usize = problem.header.dimension as usize;
 
     let mut cost = vec![vec![n32(0.0); n]; n];
     let mut x = vec![n32(0.0); n];
     let x: Vec<N32> = vec![ ];
     let y: Vec<N32> = vec![];
-    let coords = problem.data.node_coordinates.unwrap()
+    let coords = problem.data.node_coordinates.unwrap();
     // TSPLIB distances are rounded to the nearest integer to avoid the sum of square roots problem
     for i in 0..n {
       for j in 0..n {
