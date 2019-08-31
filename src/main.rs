@@ -46,7 +46,7 @@ impl PartialOrd for Node {
   }
 }
 impl TSP {
-  fn addEdge(&self, node: &mut Node, i: usize, j: usize) {
+  fn add_edge(&self, node: &mut Node, i: usize, j: usize) {
     node.lower_bound += self.cost_with_pi[i][j];
     node.degree[i] += 1;
     node.degree[j] += 1;
@@ -60,17 +60,17 @@ impl TSP {
     child.excluded[j] = node.excluded[j].clone();
     child.excluded[i][j] = true;
     child.excluded[j][i] = true;
-    self.computeHeldKarp(&mut child);
+    self.compute_held_karp(&mut child);
     child
   }
-  fn computeHeldKarp(&mut self, node: &mut Node) {
+  fn compute_held_karp(&mut self, node: &mut Node) {
     node.lower_bound = n32(std::f32::MIN);
     node.degree = vec![0; self.n];
     node.parent = vec![0; self.n];
     let mut lambda = n32(0.1);
     while lambda > 1e-06 {
       let previous_lower = node.lower_bound;
-      self.computeOneTree(node);
+      self.compute_one_tree(node);
       if node.lower_bound >= self.best.lower_bound {
         return;
       }
@@ -93,7 +93,7 @@ impl TSP {
       }
     }
   }
-  fn computeOneTree(&mut self, node: &mut Node) {
+  fn compute_one_tree(&mut self, node: &mut Node) {
     node.lower_bound = n32(0.0);
     node.degree = vec![0; self.n];
     for i in 0..self.n {
@@ -124,7 +124,7 @@ impl TSP {
         }
       }
     }
-    self.addEdge(node, 0, first_neighbor);
+    self.add_edge(node, 0, first_neighbor);
     node.parent = vec![first_neighbor; self.n];
     node.parent[first_neighbor] = 0;
     // compute the minimum spanning tree on nodes 1..n-1
@@ -136,7 +136,7 @@ impl TSP {
           i = j;
         }
       }
-      self.addEdge(node, node.parent[i], i);
+      self.add_edge(node, node.parent[i], i);
       for j in 1..self.n {
         if node.degree[j] == 0 && self.cost_with_pi[i][j] < min_cost[j] {
           min_cost[j] = self.cost_with_pi[i][j];
@@ -144,7 +144,7 @@ impl TSP {
         }
       }
     }
-    self.addEdge(node, 0, second_neighbor);
+    self.add_edge(node, 0, second_neighbor);
     node.parent[0] = second_neighbor;
     // println!(
     //   "Setting lower bound from {} to {}",
@@ -156,24 +156,24 @@ impl TSP {
   fn solve(&mut self) {
     self.best = self.new_node();
     self.best.lower_bound = n32(std::f32::MAX);
-    let mut currentNode: Node = self.new_node();
+    let mut current_node: Node = self.new_node();
     println!("{:?}", self);
-    self.computeHeldKarp(&mut currentNode);
+    self.compute_held_karp(&mut current_node);
     let mut pq = BinaryHeap::new();
     loop {
       loop {
         let mut iopt: Option<usize> = None;
         for j in 0..self.n {
-          if currentNode.degree[j] > 2
-            && (iopt.is_none() || currentNode.degree[j] < currentNode.degree[iopt.unwrap()])
+          if current_node.degree[j] > 2
+            && (iopt.is_none() || current_node.degree[j] < current_node.degree[iopt.unwrap()])
           {
             iopt = Some(j);
           }
         }
         match iopt {
           None => {
-            if currentNode.lower_bound < self.best.lower_bound {
-              self.best = currentNode.clone();
+            if current_node.lower_bound < self.best.lower_bound {
+              self.best = current_node.clone();
               // println!("{}", self.best_lb)
             }
             break;
@@ -181,16 +181,16 @@ impl TSP {
           Some(i) => {
             println!(".");
             let mut children: BinaryHeap<Node> = BinaryHeap::new();
-            let parent_i = currentNode.parent[i];
-            children.push(self.exclude(&mut currentNode, i, parent_i));
+            let parent_i = current_node.parent[i];
+            children.push(self.exclude(&mut current_node, i, parent_i));
             for j in 0..self.n {
-              if currentNode.parent[j] == i {
-                children.push(self.exclude(&mut currentNode, i, j));
+              if current_node.parent[j] == i {
+                children.push(self.exclude(&mut current_node, i, j));
               }
             }
-            currentNode = children.pop().unwrap();
+            current_node = children.pop().unwrap();
             pq.append(&mut children);
-            if currentNode.lower_bound >= self.best.lower_bound {
+            if current_node.lower_bound >= self.best.lower_bound {
               break;
             }
           }
@@ -201,13 +201,13 @@ impl TSP {
           println!("Breaking because pq.pop returned None");
           break;
         }
-        Some(new_node) => currentNode = new_node,
+        Some(new_node) => current_node = new_node,
       };
       // println!("There are {} nodes to visit", pq.len());
-      if currentNode.lower_bound > self.best.lower_bound {
+      if current_node.lower_bound > self.best.lower_bound {
         println!(
           "Breaking because current node lower bound {} is greater than best lower bound of {}",
-          currentNode.lower_bound, self.best.lower_bound
+          current_node.lower_bound, self.best.lower_bound
         );
         break;
       }
@@ -238,15 +238,27 @@ impl TSP {
     let n: usize = problem.header.dimension as usize;
 
     let mut cost = vec![vec![n32(0.0); n]; n];
-    let mut x = vec![n32(0.0); n];
-    let x: Vec<N32> = vec![ ];
-    let y: Vec<N32> = vec![];
-    let coords = problem.data.node_coordinates.unwrap();
+    let x: Vec<N32> = problem
+      .clone()
+      .data
+      .node_coordinates
+      .unwrap()
+      .iter()
+      .map(|c| c.1.clone())
+      .collect();
+    let y: Vec<N32> = problem
+      .clone()
+      .data
+      .node_coordinates
+      .unwrap()
+      .iter()
+      .map(|c| c.2.clone())
+      .collect();
     // TSPLIB distances are rounded to the nearest integer to avoid the sum of square roots problem
     for i in 0..n {
       for j in 0..n {
-        let dx = coords[i].1 - coords[j].1;
-        let dy = coords[i].2 - coords[j].2;
+        let dx = x[i] - x[j];
+        let dy = y[i] - y[j];
         cost[i][j] = (dx * dx + dy * dy).sqrt().trunc();
       }
     }
