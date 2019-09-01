@@ -1,15 +1,20 @@
 use noisy_float::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::env;
 use std::fs;
 extern crate tsplib;
 use tsplib::*;
 
 fn main() {
-  println!("Hello, TSP. Using testdata/berlin52.tsp as input !");
-  // let mut input = String::new();
-  // io::stdin().read_to_string(&mut input);
-  let mut tsp = TSP::new("testdata/berlin52.tsp".to_string());
+  let args: Vec<String> = env::args().collect();
+  let name: &str = if args.len() < 2 {
+    &"tests/testdata/berlin52.tsp"
+  } else {
+    &args[1]
+  };
+  println!("Using '{:}' as input !", name);
+  let mut tsp = TSP::new(name);
   tsp.solve();
 }
 // simple exact TSP solver based on branch-and-bound/Held--Karp
@@ -30,9 +35,20 @@ struct Node {
   degree: Vec<usize>,
   parent: Vec<usize>,
 }
+impl Node {
+  fn new(n: usize) -> Node {
+    Node {
+      excluded: vec![vec![false; n]; n],
+      pi: vec![n32(0.0); n],
+      lower_bound: n32(std::f32::MAX),
+      degree: vec![0; n],
+      parent: vec![0; n],
+    }
+  }
+}
 impl Ord for Node {
   fn cmp(&self, other: &Node) -> Ordering {
-    self.lower_bound.cmp(&other.lower_bound)
+    self.lower_bound.cmp(&other.lower_bound) //.reverse()
   }
 }
 impl PartialEq for Node {
@@ -52,7 +68,7 @@ impl TSP {
     node.degree[j] += 1;
   }
   fn exclude(&mut self, node: &mut Node, i: usize, j: usize) -> Node {
-    let mut child: Node = Default::default();
+    let mut child: Node = Node::new(self.n);
     child.pi = vec![n32(0.0); self.n];
     child.parent = vec![0; self.n];
     child.excluded = node.excluded.clone();
@@ -79,7 +95,7 @@ impl TSP {
       }
       let mut denom = 0;
       for i in 1..self.n {
-        let deg2 = (node.degree[i as usize] as i32) - 2;
+        let deg2 = (node.degree[i] as i32) - 2;
         denom += deg2 * deg2;
       }
       // println!("---DENOM : {}", denom);
@@ -130,6 +146,7 @@ impl TSP {
     // compute the minimum spanning tree on nodes 1..n-1
     let mut min_cost = self.cost_with_pi[first_neighbor].clone();
     for _k in 2..self.n {
+      //Find the first degree = 0 node
       let mut i = node.degree.iter().position(|&degree| degree == 0).unwrap();
       for j in (i + 1)..self.n {
         if node.degree[j] == 0 && min_cost[j] < min_cost[i] {
@@ -146,18 +163,12 @@ impl TSP {
     }
     self.add_edge(node, 0, second_neighbor);
     node.parent[0] = second_neighbor;
-    // println!(
-    //   "Setting lower bound from {} to {}",
-    //   node.lower_bound,
-    //   node.lower_bound.round(),
-    // );
     node.lower_bound = node.lower_bound.round();
   }
   fn solve(&mut self) {
-    self.best = self.new_node();
-    self.best.lower_bound = n32(std::f32::MAX);
-    let mut current_node: Node = self.new_node();
-    println!("{:?}", self);
+    self.best = Node::new(self.n);
+    // self.best.lower_bound = n32(std::f32::MAX);
+    let mut current_node: Node = Node::new(self.n);
     self.compute_held_karp(&mut current_node);
     let mut pq = BinaryHeap::new();
     loop {
@@ -170,40 +181,48 @@ impl TSP {
             iopt = Some(j);
           }
         }
-        match iopt {
-          None => {
-            if current_node.lower_bound < self.best.lower_bound {
-              self.best = current_node.clone();
-              // println!("{}", self.best_lb)
-            }
-            break;
+        if iopt.is_none() {
+          if current_node.lower_bound < self.best.lower_bound {
+            self.best = current_node.clone();
+            print!("{:}", self.best.lower_bound);
+            // println!(
+            //   "Updating self.best because current.lower {:} < best.lower {:}",
+            //   current_node.lower_bound, self.best.lower_bound
+            // );
           }
-          Some(i) => {
-            println!(".");
-            let mut children: BinaryHeap<Node> = BinaryHeap::new();
-            let parent_i = current_node.parent[i];
-            children.push(self.exclude(&mut current_node, i, parent_i));
-            for j in 0..self.n {
-              if current_node.parent[j] == i {
-                children.push(self.exclude(&mut current_node, i, j));
-              }
-            }
-            current_node = children.pop().unwrap();
-            pq.append(&mut children);
-            if current_node.lower_bound >= self.best.lower_bound {
-              break;
-            }
+          break;
+        }
+        print!(".");
+        let i = iopt.unwrap();
+        let mut children: BinaryHeap<Node> = BinaryHeap::new();
+        let parent_i = current_node.parent[i];
+        children.push(self.exclude(&mut current_node, i, parent_i));
+        for j in 0..self.n {
+          if current_node.parent[j] == i {
+            children.push(self.exclude(&mut current_node, i, j));
           }
         }
+        current_node = children.pop().unwrap();
+        pq.append(&mut children);
+        // println!(
+        //       "Queue length is {:}, current lower bound is {:}, best lower bound is {:}, total degree is {:}",
+        //       pq.len(),
+        //       current_node.lower_bound,
+        //       self.best.lower_bound,
+        //       current_node.degree.iter().sum::<usize>()
+        //     );
+        if current_node.lower_bound >= self.best.lower_bound {
+          break;
+        }
       }
+      println!("");
       match pq.pop() {
         None => {
-          println!("Breaking because pq.pop returned None");
+          println!("Breaking because the solution heap is empty");
           break;
         }
         Some(new_node) => current_node = new_node,
       };
-      // println!("There are {} nodes to visit", pq.len());
       if current_node.lower_bound > self.best.lower_bound {
         println!(
           "Breaking because current node lower bound {} is greater than best lower bound of {}",
@@ -212,27 +231,33 @@ impl TSP {
         break;
       }
     }
-    println!("best lower bound is {}", self.best.lower_bound);
+    self.print_sol(&self.best);
+  }
+
+  fn print_sol(&self, node: &Node) {
+    println!("best lower bound is {}", node.lower_bound);
     let mut j = 0;
-    let mut i = self.best.parent[0];
+    let mut i = node.parent[0];
     let mut cost = n32(0.0);
     while i != 0 {
-      cost += self.cost_with_pi[i][j];
-      i = self.best.parent[j];
+      i = node.parent[j];
       println!(
-        "{}->{}\t{}\t{}\t{}\t{}",
-        j,
-        i,
+        "{}->{}\t{}\t{}\t{}\t{}\t{}",
+        j + 1,
+        i + 1,
         self.x[j],
         self.y[j],
         self.x[i] - self.x[j],
-        self.y[i] - self.y[j]
+        self.y[i] - self.y[j],
+        self.cost[i][j],
       );
+      cost += self.cost[i][j];
       j = i;
     }
     println!("The trip cost is {}", cost)
   }
-  fn new(input: String) -> TSP {
+
+  fn new(input: &str) -> TSP {
     let file_contents = fs::read_to_string(input).unwrap();
     let problem = parse_whole_problem(&file_contents).unwrap().1;
     let n: usize = problem.header.dimension as usize;
@@ -268,16 +293,7 @@ impl TSP {
       y,
       cost,
       cost_with_pi: vec![vec![n32(0.0); n]; n],
-      best: Default::default(),
-    }
-  }
-  fn new_node(&self) -> Node {
-    Node {
-      excluded: vec![vec![false; self.n]; self.n],
-      pi: vec![n32(0.0); self.n],
-      lower_bound: n32(std::f32::MAX),
-      degree: vec![0; self.n],
-      parent: vec![0; self.n],
+      best: Node::new(n),
     }
   }
 }
