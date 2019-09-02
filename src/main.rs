@@ -21,17 +21,17 @@ fn main() {
 #[derive(Debug, Clone)]
 struct TSP {
   n: usize,
-  x: Vec<N32>,
-  y: Vec<N32>,
-  cost: Vec<Vec<N32>>,
-  cost_with_pi: Vec<Vec<N32>>,
+  x: Vec<N64>,
+  y: Vec<N64>,
+  cost: Vec<Vec<N64>>,
+  cost_with_pi: Vec<Vec<N64>>,
   best: Node,
 }
 #[derive(Eq, Default, Debug, Clone)]
 struct Node {
   excluded: Vec<Vec<bool>>,
-  pi: Vec<N32>,
-  lower_bound: N32,
+  pi: Vec<N64>,
+  lower_bound: N64,
   degree: Vec<usize>,
   parent: Vec<usize>,
 }
@@ -39,8 +39,8 @@ impl Node {
   fn new(n: usize) -> Node {
     Node {
       excluded: vec![vec![false; n]; n],
-      pi: vec![n32(0.0); n],
-      lower_bound: n32(std::f32::MAX),
+      pi: vec![n64(0.0); n],
+      lower_bound: n64(std::f64::MAX),
       degree: vec![0; n],
       parent: vec![0; n],
     }
@@ -69,7 +69,7 @@ impl TSP {
   }
   fn exclude(&mut self, node: &mut Node, i: usize, j: usize) -> Node {
     let mut child: Node = Node::new(self.n);
-    child.pi = vec![n32(0.0); self.n];
+    child.pi = vec![n64(0.0); self.n];
     child.parent = vec![0; self.n];
     child.excluded = node.excluded.clone();
     child.excluded[i] = node.excluded[i].clone();
@@ -80,10 +80,10 @@ impl TSP {
     child
   }
   fn compute_held_karp(&mut self, node: &mut Node) {
-    node.lower_bound = n32(std::f32::MIN);
+    node.lower_bound = n64(std::f64::MIN_POSITIVE);
     node.degree = vec![0; self.n];
     node.parent = vec![0; self.n];
-    let mut lambda = n32(0.1);
+    let mut lambda = n64(0.1);
     while lambda > 1e-06 {
       let previous_lower = node.lower_bound;
       self.compute_one_tree(node);
@@ -95,7 +95,7 @@ impl TSP {
       }
       let mut denom = 0;
       for i in 1..self.n {
-        let deg2 = (node.degree[i] as i32) - 2;
+        let deg2 = (node.degree[i] as i64) - 2;
         denom += deg2 * deg2;
       }
       // println!("---DENOM : {}", denom);
@@ -103,19 +103,19 @@ impl TSP {
         return;
       }
       // println!("---lambda, lower_bound : {}, {}", lambda, node.lower_bound);
-      let t: N32 = lambda * node.lower_bound / n32(denom as f32);
+      let t: N64 = lambda * node.lower_bound / n64(denom as f64);
       for i in 1..self.n {
-        node.pi[i as usize] += t * n32(((node.degree[i as usize] as i32) - 2) as f32);
+        node.pi[i] += t * n64(((node.degree[i] as i64) - 2) as f64);
       }
     }
   }
   fn compute_one_tree(&mut self, node: &mut Node) {
-    node.lower_bound = n32(0.0);
+    node.lower_bound = n64(0.0);
     node.degree = vec![0; self.n];
     for i in 0..self.n {
       for j in 0..self.n {
         self.cost_with_pi[i][j] = if node.excluded[i][j] {
-          n32(std::f32::MAX)
+          n64(std::f64::MAX)
         } else {
           self.cost[i][j] + node.pi[i] + node.pi[j]
         }
@@ -167,7 +167,7 @@ impl TSP {
   }
   fn solve(&mut self) {
     self.best = Node::new(self.n);
-    // self.best.lower_bound = n32(std::f32::MAX);
+    // self.best.lower_bound = n64(std::f64::MAX);
     let mut current_node: Node = Node::new(self.n);
     self.compute_held_karp(&mut current_node);
     let mut pq = BinaryHeap::new();
@@ -238,7 +238,7 @@ impl TSP {
     println!("best lower bound is {}", node.lower_bound);
     let mut j = 0;
     let mut i = node.parent[0];
-    let mut cost = n32(0.0);
+    let mut cost = n64(0.0);
     while i != 0 {
       i = node.parent[j];
       println!(
@@ -262,22 +262,22 @@ impl TSP {
     let problem = parse_whole_problem(&file_contents).unwrap().1;
     let n: usize = problem.header.dimension as usize;
 
-    let mut cost = vec![vec![n32(0.0); n]; n];
-    let x: Vec<N32> = problem
+    let mut cost = vec![vec![n64(0.0); n]; n];
+    let x: Vec<N64> = problem
       .clone()
       .data
       .node_coordinates
       .unwrap()
       .iter()
-      .map(|c| c.1.clone())
+      .map(|c| n64(c.1.raw().into()))
       .collect();
-    let y: Vec<N32> = problem
+    let y: Vec<N64> = problem
       .clone()
       .data
       .node_coordinates
       .unwrap()
       .iter()
-      .map(|c| c.2.clone())
+      .map(|c| n64(c.2.raw().into()))
       .collect();
     // TSPLIB distances are rounded to the nearest integer to avoid the sum of square roots problem
     for i in 0..n {
@@ -292,7 +292,7 @@ impl TSP {
       x,
       y,
       cost,
-      cost_with_pi: vec![vec![n32(0.0); n]; n],
+      cost_with_pi: vec![vec![n64(0.0); n]; n],
       best: Node::new(n),
     }
   }
