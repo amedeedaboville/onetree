@@ -170,7 +170,7 @@ impl TSP {
     }
     self.add_edge(node, 0, second_neighbor);
     node.parent[0] = second_neighbor;
-    node.lower_bound = node.lower_bound.round();
+    node.lower_bound = (node.lower_bound + 0.5).trunc();
   }
   fn solve(&mut self) {
     self.best = Node::new(self.n);
@@ -291,7 +291,7 @@ impl TSP {
       for j in 0..n {
         let dx = x[i] - x[j];
         let dy = y[i] - y[j];
-        cost[i][j] = (dx * dx + dy * dy).sqrt().trunc();
+        cost[i][j] = ((dx * dx + dy * dy).sqrt() + 0.5).trunc();
       }
     }
     TSP {
