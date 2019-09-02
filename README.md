@@ -2,6 +2,8 @@
 
 More is covered in this post (future link here).
 
+It was a pretty much line for line copy of the answer in (this post)[https://stackoverflow.com/questions/7159259/optimized-tsp-algorithms].
+
 This finds exact solutions to smallish (~150 cities) TSP problems.
 
 It uses branch and bound and the Held-Karp approximation.
