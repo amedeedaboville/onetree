@@ -3,6 +3,8 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::env;
 use std::fs;
+use std::io;
+use std::io::Write;
 extern crate tsplib;
 use tsplib::*;
 
@@ -13,7 +15,6 @@ fn main() {
   } else {
     &args[1]
   };
-  println!("Using '{:}' as input !", name);
   let mut tsp = TSP::new(name);
   tsp.solve();
 }
@@ -68,12 +69,15 @@ impl TSP {
     node.degree[j] += 1;
   }
   fn exclude(&mut self, node: &mut Node, i: usize, j: usize) -> Node {
-    let mut child: Node = Node::new(self.n);
-    child.pi = vec![n64(0.0); self.n];
-    child.parent = vec![0; self.n];
-    child.excluded = node.excluded.clone();
-    child.excluded[i] = node.excluded[i].clone();
-    child.excluded[j] = node.excluded[j].clone();
+    let n = self.n;
+    // let mut child: Node = Node::new(self.n);
+    let mut child: Node = Node {
+      excluded: node.excluded.clone(),
+      pi: vec![n64(0.0); n],
+      lower_bound: n64(std::f64::MAX),
+      degree: vec![0; n],
+      parent: vec![0; n],
+    };
     child.excluded[i][j] = true;
     child.excluded[j][i] = true;
     self.compute_held_karp(&mut child);
@@ -81,8 +85,6 @@ impl TSP {
   }
   fn compute_held_karp(&mut self, node: &mut Node) {
     node.lower_bound = n64(std::f64::MIN_POSITIVE);
-    node.degree = vec![0; self.n];
-    node.parent = vec![0; self.n];
     let mut lambda = n64(0.1);
     while lambda > 1e-06 {
       let previous_lower = node.lower_bound;
@@ -173,11 +175,13 @@ impl TSP {
     node.lower_bound = (node.lower_bound + 0.5).trunc();
   }
   fn solve(&mut self) {
+    println!("Solving.");
     self.best = Node::new(self.n);
-    // self.best.lower_bound = n64(std::f64::MAX);
     let mut current_node: Node = Node::new(self.n);
     self.compute_held_karp(&mut current_node);
     let mut pq = BinaryHeap::new();
+    println!("Held Karp computed. Starting loop.");
+    self.best = Node::new(self.n);
     loop {
       loop {
         let mut iopt: Option<usize> = None;
@@ -192,16 +196,13 @@ impl TSP {
           if current_node.lower_bound < self.best.lower_bound {
             self.best = current_node.clone();
             print!("{:}", self.best.lower_bound);
-            // println!(
-            //   "Updating self.best because current.lower {:} < best.lower {:}",
-            //   current_node.lower_bound, self.best.lower_bound
-            // );
           }
           break;
         }
         print!(".");
+        io::stdout().flush().unwrap();
         let i = iopt.unwrap();
-        let mut children: BinaryHeap<Node> = BinaryHeap::new();
+        let mut children: BinaryHeap<Node> = BinaryHeap::with_capacity(11);
         let parent_i = current_node.parent[i];
         children.push(self.exclude(&mut current_node, i, parent_i));
         for j in 0..self.n {
@@ -211,13 +212,6 @@ impl TSP {
         }
         current_node = children.pop().unwrap();
         pq.append(&mut children);
-        // println!(
-        //       "Queue length is {:}, current lower bound is {:}, best lower bound is {:}, total degree is {:}",
-        //       pq.len(),
-        //       current_node.lower_bound,
-        //       self.best.lower_bound,
-        //       current_node.degree.iter().sum::<usize>()
-        //     );
         if current_node.lower_bound >= self.best.lower_bound {
           break;
         }
@@ -225,16 +219,13 @@ impl TSP {
       println!("");
       match pq.pop() {
         None => {
-          println!("Breaking because the solution heap is empty");
           break;
         }
-        Some(new_node) => current_node = new_node,
+        Some(new_node) => {
+          current_node = new_node;
+        }
       };
       if current_node.lower_bound >= self.best.lower_bound {
-        println!(
-          "Breaking because current node lower bound {} is greater than best lower bound of {}",
-          current_node.lower_bound, self.best.lower_bound
-        );
         break;
       }
     }
@@ -249,7 +240,7 @@ impl TSP {
     while i != 0 {
       i = node.parent[j];
       println!(
-        "{}->{}\t{}\t{}\t{}\t{}\t{}",
+        "{}\t->\t{}\t{}\t{}\t{}\t{}\t{}",
         j + 1,
         i + 1,
         self.x[j],
