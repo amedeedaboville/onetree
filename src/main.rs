@@ -147,7 +147,14 @@ impl TSP {
     let mut min_cost = self.cost_with_pi[first_neighbor].clone();
     for _k in 2..self.n {
       //Find the first degree = 0 node
-      let mut i = node.degree.iter().position(|&degree| degree == 0).unwrap();
+      let mut i = 1;
+      while i < self.n {
+        if node.degree[i] == 0 {
+          break;
+        }
+        i += 1;
+      }
+      // node.degree .iter() .skip(1) .position(|&degree| degree == 0) .unwrap();
       for j in (i + 1)..self.n {
         if node.degree[j] == 0 && min_cost[j] < min_cost[i] {
           i = j;
