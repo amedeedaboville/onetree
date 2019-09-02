@@ -230,7 +230,7 @@ impl TSP {
         }
         Some(new_node) => current_node = new_node,
       };
-      if current_node.lower_bound > self.best.lower_bound {
+      if current_node.lower_bound >= self.best.lower_bound {
         println!(
           "Breaking because current node lower bound {} is greater than best lower bound of {}",
           current_node.lower_bound, self.best.lower_bound
