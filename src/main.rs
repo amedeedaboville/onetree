@@ -48,7 +48,7 @@ impl Node {
 }
 impl Ord for Node {
   fn cmp(&self, other: &Node) -> Ordering {
-    self.lower_bound.cmp(&other.lower_bound) //.reverse()
+    self.lower_bound.cmp(&other.lower_bound).reverse()
   }
 }
 impl PartialEq for Node {
